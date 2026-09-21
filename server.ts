@@ -1,0 +1,42 @@
+import express from 'express';
+import path from 'path';
+import { createServer as createViteServer } from 'vite';
+import { connectDatabase } from './server/db.ts';
+import apiRouter from './server/routes.ts';
+
+async function startServer() {
+  const app = express();
+  const PORT = 3000;
+
+  // Body parsing middleware
+  app.use(express.json());
+
+  // Connect Database (MongoDB or embedded state engine)
+  await connectDatabase();
+
+  // Mount API routes
+  app.use('/api', apiRouter);
+
+  // Vite middleware in development vs Static serving in production
+  if (process.env.NODE_ENV !== 'production') {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Stock Management System server running on http://0.0.0.0:${PORT}`);
+  });
+}
+
+startServer().catch(err => {
+  console.error('Fatal server startup error:', err);
+});
